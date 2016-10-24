@@ -1,3 +1,6 @@
+## local Config ##
+local.properties
+
 ## gradle ##
 .gradle
 /build/
@@ -21,6 +24,24 @@ temp/*
 .idea/dictionaries/*
 .idea/uiDesigner.xml
 .idea/misc.xml
+## output binaries
+build/*
+temp/*
+
+# Intellij project files
+# @see http://devnet.jetbrains.com/docs/DOC-1186
+.idea/workspace.xml
+.idea/tasks.xml
+.idea/misc.xml
+.idea/dataSources.ids
+.idea/dataSources.xml
+.idea/dataSources.local.xml
+.idea/sqlDataSources.xml
+.idea/dynamic.xml
+.idea/uiDesigner.xml
+.idea/gradle.xml
+.idea/libraries
+
 
 # Windows Installer files
 *.cab
