@@ -1,0 +1,129 @@
+import java.nio.file.Paths
+
+buildscript {
+  ext.kotlin_version = '1.0.4'
+
+  repositories {
+    mavenCentral()
+    jcenter()
+  }
+  dependencies {
+    classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
+  }
+}
+
+plugins {
+  id "net.ltgt.apt" version "0.9"
+  id 'com.github.johnrengelman.shadow' version '1.2.3'
+}
+
+ext {
+  sourceCompatibility = 1.8
+  targetCompatibility = 1.8
+}
+
+apply plugin: 'java'
+apply plugin: 'kotlin'
+apply plugin: 'kotlin-kapt'
+apply plugin: 'application'
+
+group 'com.empowerops'
+version '0.1-SNAPSHOT'
+
+mainClassName = "com.empowerops.SingularityKt"
+def exeDir = "$buildDir/exe"
+
+dependencies {
+  // https://mvnrepository.com/artifact/com.google.guava/guava
+  compile group: 'com.google.guava', name: 'guava', version: '19.0'
+  compile "org.jetbrains.kotlin:kotlin-stdlib:$kotlin_version"
+  compile 'com.beust:jcommander:1.58'
+  testCompile group: 'junit', name: 'junit', version: '4.11'
+  testCompile 'com.google.jimfs:jimfs:1.1'
+  testCompile 'org.assertj:assertj-core:3.5.2'
+
+  // Add Dagger dependencies
+  compile 'com.google.dagger:dagger:2.7'
+  compile 'com.google.auto.factory:auto-factory:1.0-beta3'
+
+  kapt 'com.google.dagger:dagger-compiler:2.7'
+  kaptTest 'com.google.dagger:dagger-compiler:2.7'
+}
+
+repositories {
+  mavenCentral()
+  jcenter()
+}
+
+sourceSets {
+  main {
+    java {
+      srcDir "${buildDir}/generated/source/kapt2/main"
+    }
+  }
+  test {
+    java {
+      srcDir "${buildDir}/generated/source/kapt2/main"
+      srcDir "${buildDir}/generated/source/kapt2/test"
+    }
+  }
+}
+
+// ook, so this doesnt work, and I cant find any documentation on it, so I give.
+// kapt's default strategy is to put this information in ./build/generated/source/kapt2/main/...
+// which I dont really like, but it works just fine, so I'll leave it.
+// what I was trying to do here was move it into ./src/gen/java, --(and then I'd subsequently ignore it)
+// to me, the fact that its java source code is more important than the fact that its generated,
+// meaning that I think it should be put with the other source code in /src.
+//
+//kapt {
+//    arguments {
+//        arg("-s", "${getRootDir}/src/gen/java")
+//    }
+//}
+
+shadowJar {
+  baseName = 'singularity'
+  classifier = null
+  version = project.version
+}
+
+//noinspection GroovyAssignabilityCheck -- not sure why, intelliJ doesnt like 'dependsOn'
+task createLauncherWin(dependsOn: ':shadowJar') << {
+
+  Properties props = new Properties()
+  props.load(new FileInputStream("local.properties"))
+  def exe4jHome = props.getProperty("exe4j.home")
+
+  if (exe4jHome == null) {
+    throw new GradleException(
+        "Couldn't find exe4j home. " +
+            "Please specify it in 'local.properties' in the project root directory"
+    )
+  }
+
+  logger.debug "Setting for EXE4J_HOME is: $exe4jHome"
+
+  File exe4jJar = file("$exe4jHome/bin/ant.jar")
+
+  logger.debug "Looking here for Exej4 jar: ${exe4jJar.getAbsolutePath()}"
+
+  if (!exe4jJar.exists()) {
+    throw new GradleException(
+        "Expected to find Exe4j in $exe4jHome, " +
+            "but the file $exe4jHome/bin/ant.jar was not found. " +
+            "Please install Exe4j and try again"
+    )
+  }
+
+  def updatedText = file('singularity.template.exe4j').getText().replace('$$SINGULARITY_MONOLITHIC_JAR$$', "${jar.archivePath}")
+  def updatedFile = file("$buildDir/tmp/exe4j/singularity_updated.exe4j")
+  updatedFile.parentFile.mkdirs()
+  updatedFile.write(updatedText)
+
+  ant.taskdef(name: 'exe4j', classpath: "$exe4jHome/bin/ant.jar", classname: "com.exe4j.Exe4JTask")
+  ant.exe4j(projectfile: "$updatedFile", destination: exeDir)
+
+  //todo add a version string to the metadata here?
+}
+
